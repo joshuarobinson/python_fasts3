@@ -9,10 +9,6 @@ crate-type = ["cdylib"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-#[dependencies.pyo3]
-#version = "0.15.1"
-#features = ["extension-module"]
-
 [dependencies]
 pyo3 = { version = "0.15.1", features = ["extension-module"] }
 #pyo3-asyncio = { version = "0.15.0", features = ["attributes", "tokio-runtime"] }

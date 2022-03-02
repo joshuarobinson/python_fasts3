@@ -6,43 +6,20 @@ import time
 
 
 ENDPOINT_URL='http://10.62.64.207'
-
-def collatz_py(n: int) -> [int]:
-    seq = []
-    while n != 1:
-        seq.append(n)
-        if n % 2 == 0:
-            n = n / 2
-        else:
-            n = 3 * n + 1
-    return seq
-
-
-i = 9780657630
-start = time.time()
-n = len(collatz_py(i))
-elapsed_py = time.time() - start
-print("Collatz_py({}) -> len={}, {}".format(i, n, elapsed_py))
-
-
-start = time.time()
-n = len(fasts3.collatz(i))
-elapsed_rust = time.time() - start
-print("Collatz_rust({}) -> len={}, {}".format(i, n, elapsed_rust))
-
-print("Rust is {:.1f}x faster than Python".format(elapsed_py / elapsed_rust))
-
 BUCKET="joshuarobinson"
 OBJECT="foo.txt"
 
+
+# Initialize boto3, fsspec, and fasts3
 storage_options = {'endpoint_url': ENDPOINT_URL}
 fs = fsspec.filesystem('s3', client_kwargs=storage_options)
 
 s = fasts3.FastS3FileSystem(name="Joshua", endpoint=ENDPOINT_URL)
 
-s3r = boto3.resource('s3', use_ssl=False, endpoint_url=ENDPOINT_URL)
+s3r = boto3.resource('s3', endpoint_url=ENDPOINT_URL)
 
 
+print("Benchmarking get_object operation")
 start = time.time()
 bytes_buffer = io.BytesIO()
 s3r.meta.client.download_fileobj(Bucket=BUCKET, Key=OBJECT, Fileobj=bytes_buffer)
@@ -55,11 +32,12 @@ elapsed_rust = time.time() - start
 print("fasts3 get_object, len={}, {}".format(len(contents), elapsed_rust))
 
 if bytes_buffer.getbuffer() != contents:
-    print("BOO, mismatched contents")
+    print("Error, mismatched contents")
 
 print("Rust is {:.1f}x faster than Python".format(elapsed_b / elapsed_rust))
 
 
+print("Benchmarking list operation")
 start = time.time()
 listingc = fs.ls('/joshuarobinson/opensky/staging1/movements/')
 elapsed_fs = time.time() - start

@@ -126,7 +126,6 @@ impl FastS3FileSystem {
             let obj_size = resp.content_length() as usize;
             pybuf.resize(obj_size)?;
 
-            //let mut buf: Vec<u8> = vec![0u8; obj_size];
             let landing_buf = unsafe { pybuf.as_bytes_mut() };
             let mut landing_slices: Vec<&mut [u8]> = landing_buf.chunks_mut(READCHUNK).collect();
 
@@ -164,27 +163,11 @@ impl FastS3FileSystem {
     }
 }
 
-#[pyfunction]
-fn collatz(i: i64) -> PyResult<Vec<i64>> {
-    let mut seq = Vec::new();
-    let mut b = i;
-    while b != 1 {
-        seq.push(b);
-        if b % 2 == 0 {
-            b = b / 2;
-        } else {
-            b = (3 * b) + 1;
-        }
-    }
-    return Ok(seq);
-}
-
 /// A Python module implemented in Rust. The name of this function must match
 /// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
 /// import the module.
 #[pymodule]
 fn fasts3(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(collatz, m)?)?;
     m.add_class::<FastS3FileSystem>()?;
 
     Ok(())
