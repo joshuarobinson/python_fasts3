@@ -14,7 +14,7 @@ OBJECT="foo.txt"
 storage_options = {'endpoint_url': ENDPOINT_URL}
 fs = fsspec.filesystem('s3', client_kwargs=storage_options)
 
-s = fasts3.FastS3FileSystem(name="Joshua", endpoint=ENDPOINT_URL)
+s = fasts3.FastS3FileSystem(endpoint=ENDPOINT_URL)
 
 s3r = boto3.resource('s3', endpoint_url=ENDPOINT_URL)
 
@@ -44,7 +44,6 @@ elapsed_fs = time.time() - start
 print("fsspec-s3 ls, len={}, {}".format(len(listingc), elapsed_fs))
 
 
-s.printer()
 start = time.time()
 listing = s.ls('joshuarobinson/opensky/staging1/movements/')
 elapsed_rust = time.time() - start

@@ -13,7 +13,6 @@ const READCHUNK: usize = 1024 * 1024 * 128;
 #[pyclass]
 pub struct FastS3FileSystem {
     #[pyo3(get, set)]
-    pub name: String,
     pub endpoint: String,
 }
 
@@ -65,13 +64,10 @@ async fn drain_stream(mut s: ByteStream, aperture: &mut [u8]) -> Result<usize, E
 #[pymethods]
 impl FastS3FileSystem {
     #[new]
-    pub fn new(name: String, endpoint: String) -> FastS3FileSystem {
-        FastS3FileSystem { name, endpoint }
+    pub fn new(endpoint: String) -> FastS3FileSystem {
+        FastS3FileSystem { endpoint }
     }
 
-    pub fn printer(&self) {
-        println!("Named {} @ {}", self.name, self.endpoint);
-    }
     pub fn ls(&self, path: &str) -> PyResult<Vec<String>> {
         let (bucket, prefix) = path_to_bucketprefix(path);
         println!("Bucket list for {} {}", bucket, prefix);
