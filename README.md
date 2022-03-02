@@ -1,7 +1,7 @@
 # python_fasts3
 Fast S3 in Python using Rust
 
-A Rust library that can be called from Python to perform S3 operations. The goal is to be significantly faster than Python-only S3 code like boto3.
+A Rust library that can be called from Python to perform S3 operations. The goal is to be significantly faster than Python-only S3 code like boto3. Currently only supports very basic ls() and get_object() functionality and is meant as a POC, not for production usage.
 
 Using fasts3 from python should be simple and fast:
 ```
