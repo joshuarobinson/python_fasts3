@@ -1,0 +1,25 @@
+[package]
+name = "fasts3"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "fasts3"
+crate-type = ["cdylib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+#[dependencies.pyo3]
+#version = "0.15.1"
+#features = ["extension-module"]
+
+[dependencies]
+pyo3 = { version = "0.15.1", features = ["extension-module"] }
+#pyo3-asyncio = { version = "0.15.0", features = ["attributes", "tokio-runtime"] }
+aws-config = "0.8.0"
+aws-sdk-s3 = "0.8.0"
+aws-endpoint = "0.8.0"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+http = "0.2"
+futures = "0.3"
