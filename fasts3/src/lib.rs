@@ -20,7 +20,6 @@ impl FastS3FileSystem {
     fn get_client(&self) -> aws_sdk_s3::Client {
         let region = Region::new("us-west-2");
 
-        //let mut conf: aws_types::config::Config;
         let rt = tokio::runtime::Runtime::new().unwrap();
         let conf = rt.block_on(async { aws_config::load_from_env().await });
 
@@ -34,8 +33,8 @@ impl FastS3FileSystem {
     }
 }
 
+// Extract path into bucket + prefix
 fn path_to_bucketprefix(path: &str) -> (String, String) {
-    // Extract path into bucket + prefix
     let s3path = std::path::Path::new(path);
     let mut path_it = s3path.iter();
     let bucket = path_it.next().unwrap().to_str().unwrap();
@@ -51,11 +50,12 @@ fn path_to_bucketprefix(path: &str) -> (String, String) {
     (bucket.to_string(), prefix)
 }
 
-async fn drain_stream(mut s: ByteStream, aperture: &mut [u8]) -> Result<usize, Error> {
+// Write contents of ByteStream into destination buffer.
+async fn drain_stream(mut s: ByteStream, dest: &mut [u8]) -> Result<usize, Error> {
     let mut offset = 0;
     while let Ok(Some(bytes)) = s.try_next().await {
         let span = offset..offset + bytes.len();
-        aperture[span].clone_from_slice(&bytes);
+        dest[span].clone_from_slice(&bytes);
         offset += bytes.len();
     }
     Ok(offset)
@@ -70,7 +70,6 @@ impl FastS3FileSystem {
 
     pub fn ls(&self, path: &str) -> PyResult<Vec<String>> {
         let (bucket, prefix) = path_to_bucketprefix(path);
-        println!("Bucket list for {} {}", bucket, prefix);
 
         let client = self.get_client();
         let mut continuation_token = String::from("");
