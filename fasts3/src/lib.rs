@@ -14,22 +14,28 @@ const READCHUNK: usize = 1024 * 1024 * 128;
 pub struct FastS3FileSystem {
     #[pyo3(get, set)]
     pub endpoint: String,
+
+    s3_client: aws_sdk_s3::Client,
+}
+
+fn build_client(endpoint: &str) -> aws_sdk_s3::Client {
+    let region = Region::new("us-west-2");
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let conf = rt.block_on(async { aws_config::load_from_env().await });
+
+    let ep = Endpoint::immutable(endpoint.parse::<Uri>().unwrap());
+    let s3_conf = aws_sdk_s3::config::Builder::from(&conf)
+        .endpoint_resolver(ep)
+        .region(region)
+        .build();
+
+    Client::from_conf(s3_conf)
 }
 
 impl FastS3FileSystem {
-    fn get_client(&self) -> aws_sdk_s3::Client {
-        let region = Region::new("us-west-2");
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let conf = rt.block_on(async { aws_config::load_from_env().await });
-
-        let ep = Endpoint::immutable(self.endpoint.parse::<Uri>().unwrap());
-        let s3_conf = aws_sdk_s3::config::Builder::from(&conf)
-            .endpoint_resolver(ep)
-            .region(region)
-            .build();
-
-        Client::from_conf(s3_conf)
+    fn get_client(&self) -> &aws_sdk_s3::Client {
+        &self.s3_client
     }
 }
 
@@ -65,7 +71,11 @@ async fn drain_stream(mut s: ByteStream, dest: &mut [u8]) -> Result<usize, Error
 impl FastS3FileSystem {
     #[new]
     pub fn new(endpoint: String) -> FastS3FileSystem {
-        FastS3FileSystem { endpoint }
+        let c = build_client(&endpoint);
+        FastS3FileSystem {
+            endpoint: endpoint,
+            s3_client: c,
+        }
     }
 
     pub fn ls(&self, path: &str) -> PyResult<Vec<String>> {

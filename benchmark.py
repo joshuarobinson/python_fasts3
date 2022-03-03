@@ -9,6 +9,7 @@ ENDPOINT_URL='http://10.62.64.207'
 BUCKET="joshuarobinson"
 OBJECT="foo.txt"
 
+SMALL_OBJECT="2021-06-04-17.03.28.jpg"
 
 # Initialize boto3, fsspec, and fasts3
 storage_options = {'endpoint_url': ENDPOINT_URL}
@@ -19,7 +20,25 @@ s = fasts3.FastS3FileSystem(endpoint=ENDPOINT_URL)
 s3r = boto3.resource('s3', endpoint_url=ENDPOINT_URL)
 
 
-print("Benchmarking get_object operation")
+print("Benchmarking small get_object operation")
+start = time.time()
+bytes_buffer = io.BytesIO()
+s3r.meta.client.download_fileobj(Bucket=BUCKET, Key=SMALL_OBJECT, Fileobj=bytes_buffer)
+elapsed_b = time.time() - start
+print("boto3 download small, len={}, {}".format(bytes_buffer.getbuffer().nbytes, elapsed_b))
+
+start = time.time()
+contents = s.get_object(BUCKET, SMALL_OBJECT)
+elapsed_rust = time.time() - start
+print("fasts3 get_object small, len={}, {}".format(len(contents), elapsed_rust))
+
+if bytes_buffer.getbuffer() != contents:
+    print("Error, mismatched contents")
+
+print("Rust is {:.1f}x faster than Python".format(elapsed_b / elapsed_rust))
+
+
+print("Benchmarking large get_object operation")
 start = time.time()
 bytes_buffer = io.BytesIO()
 s3r.meta.client.download_fileobj(Bucket=BUCKET, Key=OBJECT, Fileobj=bytes_buffer)
