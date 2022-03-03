@@ -10,6 +10,11 @@ s = fasts3.FastS3FileSystem(endpoint=ENDPOINT_URL)
 contents = s.get_object(BUCKETNAME, OBJECTNAME)
 ```
 
+Compile the Rust library into wheel format using maturin:
+```
+cd fasts3/ && maturin build --release
+```
+
 Example output from benchmark program:
 ```
 Benchmarking get_object operation
