@@ -1,6 +1,6 @@
 use pyo3::exceptions::PyIOError;
 use pyo3::prelude::*;
-use pyo3::types::PyByteArray;
+use pyo3::types::{PyByteArray, PyList};
 
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Endpoint, Error, Region};
@@ -40,7 +40,7 @@ impl FastS3FileSystem {
 }
 
 // Extract path into bucket + prefix
-fn path_to_bucketprefix(path: &str) -> (String, String) {
+fn path_to_bucketprefix(path: &String) -> (String, String) {
     let s3path = std::path::Path::new(path);
     let mut path_it = s3path.iter();
     let bucket = path_it.next().unwrap().to_str().unwrap();
@@ -79,7 +79,7 @@ impl FastS3FileSystem {
     }
 
     pub fn ls(&self, path: &str) -> PyResult<Vec<String>> {
-        let (bucket, prefix) = path_to_bucketprefix(path);
+        let (bucket, prefix) = path_to_bucketprefix(&path.to_string());
 
         let client = self.get_client();
         let mut continuation_token = String::from("");
@@ -117,51 +117,68 @@ impl FastS3FileSystem {
         listing
     }
 
-    pub fn get_object(&self, py: Python, bucket: &str, key: &str) -> PyResult<PyObject> {
+    pub fn get_objects(&self, py: Python, paths: Vec<String>) -> PyResult<PyObject> {
+        let pathpairs: Vec<(String, String)> = paths.iter().map(path_to_bucketprefix).collect();
+
         let client = self.get_client();
         let rt = tokio::runtime::Runtime::new().unwrap();
 
-        let pybuf = PyByteArray::new(py, &[]);
+        let mut pybuf_list = Vec::new();
+        for _ in &pathpairs {
+            pybuf_list.push(PyByteArray::new(py, &[]));
+        }
 
-        let buf = rt.block_on(async {
-            let resp = match client.head_object().bucket(bucket).key(key).send().await {
+        let return_buf = rt.block_on(async {
+            let mut head_reqs = vec![];
+            for (bucket, key) in &pathpairs {
+                head_reqs.push(client.head_object().bucket(bucket).key(key).send());
+            }
+            let head_results = match try_join_all(head_reqs).await {
                 Ok(r) => r,
                 Err(e) => return Err(PyIOError::new_err(e.to_string())),
             };
-            let obj_size = resp.content_length() as usize;
-            pybuf.resize(obj_size)?;
+            let obj_sizes: Vec<usize> = head_results.iter().map(|x| x.content_length() as usize).collect();
 
-            let landing_buf = unsafe { pybuf.as_bytes_mut() };
-            let mut landing_slices: Vec<&mut [u8]> = landing_buf.chunks_mut(READCHUNK).collect();
+            for (p, o) in pybuf_list.iter_mut().zip(obj_sizes) {
+                p.resize(o)?;
+            }
 
-            let mut read_offset = 0;
             let mut read_reqs = vec![];
-            while read_offset < obj_size {
-                let read_upper = std::cmp::min(obj_size, read_offset + READCHUNK);
-                let byte_range = format!("bytes={}-{}", read_offset, read_upper - 1);
 
-                let resp = match client
-                    .get_object()
-                    .bucket(bucket)
-                    .key(key)
-                    .range(byte_range)
-                    .send()
-                    .await
-                {
-                    Ok(r) => r,
-                    Err(e) => return Err(PyIOError::new_err(e.to_string())),
-                };
+            for (pybuf, (bucket, key)) in pybuf_list.iter_mut().zip(&pathpairs) {
+                let obj_size = pybuf.len();
+                let landing_buf = unsafe { pybuf.as_bytes_mut() };
+                let mut landing_slices: Vec<&mut [u8]> = landing_buf.chunks_mut(READCHUNK).collect();
 
-                read_reqs.push(drain_stream(resp.body, landing_slices.remove(0)));
+                let mut read_offset = 0;
+                while read_offset < obj_size {
+                    let read_upper = std::cmp::min(obj_size, read_offset + READCHUNK);
+                    let byte_range = format!("bytes={}-{}", read_offset, read_upper - 1);
 
-                read_offset += READCHUNK;
+                    let resp = match client
+                        .get_object()
+                        .bucket(bucket)
+                        .key(key)
+                        .range(byte_range)
+                        .send()
+                        .await
+                    {
+                        Ok(r) => r,
+                        Err(e) => return Err(PyIOError::new_err(e.to_string())),
+                    };
+
+                    read_reqs.push(drain_stream(resp.body, landing_slices.remove(0)));
+
+                    read_offset += READCHUNK;
+                }
             }
             let _results = try_join_all(read_reqs).await.unwrap();
 
-            Ok(pybuf)
+            let pybufs: &PyList = PyList::new(py, pybuf_list);
+            Ok(pybufs)
         });
 
-        match buf {
+        match return_buf {
             Ok(b) => Ok(b.into()),
             Err(e) => Err(e),
         }
