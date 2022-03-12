@@ -24,11 +24,13 @@ fn build_client(endpoint: &str) -> aws_sdk_s3::Client {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let conf = rt.block_on(async { aws_config::load_from_env().await });
 
-    let ep = Endpoint::immutable(endpoint.parse::<Uri>().unwrap());
-    let s3_conf = aws_sdk_s3::config::Builder::from(&conf)
-        .endpoint_resolver(ep)
-        .region(region)
-        .build();
+    let s3_conf = match endpoint.is_empty() {
+        true => aws_sdk_s3::config::Builder::from(&conf).region(region).build(),
+        false => aws_sdk_s3::config::Builder::from(&conf)
+            .endpoint_resolver(Endpoint::immutable(endpoint.parse::<Uri>().unwrap()))
+            .region(region)
+            .build(),
+    };
 
     Client::from_conf(s3_conf)
 }
