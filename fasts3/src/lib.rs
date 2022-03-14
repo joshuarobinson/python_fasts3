@@ -84,34 +84,22 @@ impl FastS3FileSystem {
         let (bucket, prefix) = path_to_bucketprefix(&path.to_string());
 
         let client = self.get_client();
-        let mut continuation_token = String::from("");
-
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let listing = rt.block_on(async {
-            let mut listing: Vec<String> = Vec::new();
-            loop {
-                let resp = match client
-                    .list_objects_v2()
-                    .bucket(&bucket)
-                    .prefix(&prefix)
-                    .delimiter('/')
-                    .continuation_token(continuation_token)
-                    .send()
-                    .await
-                {
-                    Ok(r) => r,
-                    Err(e) => return Err(PyIOError::new_err(e.to_string())),
-                };
 
-                for object in resp.contents().unwrap_or_default() {
+        let listing = rt.block_on(async {
+            let mut page_stream = client
+                .list_objects_v2()
+                .bucket(&bucket)
+                .prefix(&prefix)
+                .delimiter('/')
+                .into_paginator()
+                .send();
+
+            let mut listing: Vec<String> = Vec::new();
+            while let Some(Ok(lp)) = page_stream.next().await {
+                for object in lp.contents().unwrap_or_default() {
                     let key = object.key().unwrap_or_default();
                     listing.push(key.to_string());
-                }
-
-                if resp.is_truncated() {
-                    continuation_token = resp.next_continuation_token().unwrap().to_string();
-                } else {
-                    break;
                 }
             }
             Ok(listing)
