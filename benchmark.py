@@ -89,29 +89,37 @@ print("Rust is {:.1f}x faster than Python".format(elapsed_b / elapsed_rust))
 
 print("Benchmarking large get_object operation")
 
-start = time.time()
-contents = s.get_objects([OBJECTPATH])[0]
-elapsed_rust = time.time() - start
-print("fasts3 large get_object, len={}, {}".format(len(contents), elapsed_rust))
+test_objects = ["foo64m.txt", "foo128m.txt", "foo256m.txt", "foo500m.txt", "foo1g.txt", "foo2g.txt", "foo3g.txt", "foo4g.txt", "foo.txt", "foo10G.txt"]
 
-start = time.time()
-bytes_buffer = io.BytesIO()
-s3r.meta.client.download_fileobj(Bucket=BUCKET, Key=OBJECT, Fileobj=bytes_buffer)
-elapsed_b = time.time() - start
-print("boto3 large download, len={}, {}".format(bytes_buffer.getbuffer().nbytes, elapsed_b))
+for _ in range(3):
+    for object_key in test_objects:
+        object_path = BUCKET + '/' + object_key
+        print(object_path)
 
-start = time.time()
-data = bucket.Object(OBJECT).get().get('Body').read()
-elapsed_bg = time.time() - start
-print("boto3 large get, len={}, {}".format(len(data), elapsed_bg))
+        start = time.time()
+        contents = s.get_objects([object_path])[0]
+        elapsed_rust = time.time() - start
+        print("fasts3 large get_object, len={}, {}".format(len(contents), elapsed_rust))
 
-if bytes_buffer.getbuffer() != contents:
-    print("ERROR, mismatched contents")
-    exit()
+        start = time.time()
+        bytes_buffer = io.BytesIO()
+        s3r.meta.client.download_fileobj(Bucket=BUCKET, Key=object_key, Fileobj=bytes_buffer)
+        elapsed_b = time.time() - start
+        print("boto3 large download, len={}, {}".format(bytes_buffer.getbuffer().nbytes, elapsed_b))
 
-print("Rust is {:.1f}x faster than Python download_fileobj and {:.1f}x faster than Python get".format(elapsed_b / elapsed_rust, elapsed_bg / elapsed_rust))
+        start = time.time()
+        data = bucket.Object(object_key).get().get('Body').read()
+        elapsed_bg = time.time() - start
+        print("boto3 large get, len={}, {}".format(len(data), elapsed_bg))
 
-exit()
+        if bytes_buffer.getbuffer() != contents:
+            print("ERROR, mismatched contents")
+            exit()
+
+        object_size_mb = len(contents) / (1024 * 1024)
+        print("Rust is {:.1f}x faster than Python download_fileobj and {:.1f}x faster than Python get".format(elapsed_b / elapsed_rust, elapsed_bg / elapsed_rust))
+        print("RESULT-get,{:.1f},{},{},{}".format(object_size_mb, elapsed_bg, elapsed_b, elapsed_rust))
+
 LISTPATH="joshuarobinson/opensky/staging1/movements/"
 
 print("Benchmarking list operation")
@@ -119,7 +127,6 @@ start = time.time()
 listingc = fs.ls(LISTPATH)
 elapsed_fs = time.time() - start
 print("fsspec-s3 ls, len={}, {}".format(len(listingc), elapsed_fs))
-
 
 start = time.time()
 listing = s.ls(LISTPATH)
@@ -129,8 +136,10 @@ print("fasts3 ls, len={}, {}".format(len(listing), elapsed_rust))
 start = time.time()
 paginator = s3r.meta.client.get_paginator('list_objects_v2')
 pages = paginator.paginate(Bucket='joshuarobinson', Prefix='opensky/staging1/movements/')
+# The line below assumes at least one key returned.
 listingb = [obj['Key'] for page in pages for obj in page['Contents']]
 elapsed_py = time.time() - start
 print("boto3 ls, len={}, {}".format(len(listingb), elapsed_py))
     
-print("Rust is {:.1f}x faster than Boto3 and {:.1f}x faster than fsspec".format(elapsed_py / elapsed_rust, elapsed_fs / elapsed_rust))
+print("Rust ls() is {:.1f}x faster than Boto3 and {:.1f}x faster than fsspec".format(elapsed_py / elapsed_rust, elapsed_fs / elapsed_rust))
+print("RESULT-ls,{},{},{},{}".format(len(listing), elapsed_fs, elapsed_py, elapsed_rust))
