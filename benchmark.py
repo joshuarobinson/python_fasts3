@@ -6,13 +6,20 @@ import multiprocessing as mp
 import time
 
 
+# Constants used in testing.
 ENDPOINT_URL='http://10.62.64.207'
 BUCKET="joshuarobinson"
-OBJECT="foo.txt"
-OBJECTPATH=BUCKET + '/' + OBJECT
 
+# Small object download and group of object download
 SMALL_OBJECT="2021-06-04-17.03.28.jpg"
 SMALL_PATH=BUCKET + '/' + SMALL_OBJECT
+GROUPPATH="balloons/"
+
+# for list_objects_v2 and ls
+LISTPATH="joshuarobinson/opensky/staging1/movements/"
+
+# Large objects of various sizes
+TEST_OBJECTS = ["foo64m.txt", "foo128m.txt", "foo256m.txt", "foo500m.txt", "foo1g.txt", "foo2g.txt", "foo3g.txt", "foo4g.txt", "foo.txt", "foo10G.txt"]
 
 
 # Initialize boto3, fsspec, and fasts3
@@ -44,13 +51,14 @@ print("boto3 small get, len={}, {}".format(len(data), elapsed_bg))
 
 if bytes_buffer.getbuffer() != contents:
     print("Error, mismatched contents")
+    exit()
 
 print("Rust is {:.1f}x faster than Python download_fileobj and {:.1f}x faster than Python get".format(elapsed_b / elapsed_rust, elapsed_bg / elapsed_rust))
 
 
 print("Benchmarking group get_object operation")
 
-IMGPATH=BUCKET + "/balloons/"
+IMGPATH=BUCKET + "/" + GROUPPATH
 image_keys = s.ls(IMGPATH)
 image_paths = [BUCKET + '/' + p for p in image_keys]
 
@@ -61,6 +69,7 @@ contents = s.get_objects(image_paths)
 elapsed_rust = time.time() - start
 print("fasts3 download group, len={}, {}".format(len(contents), elapsed_rust))
 
+# Define boto3 download function so it can be used by Threadpool map()
 def do_boto3_download(key: str):
     bytes_buffer = io.BytesIO()
     s3r.meta.client.download_fileobj(Bucket=BUCKET, Key=key, Fileobj=bytes_buffer)
@@ -69,9 +78,6 @@ def do_boto3_download(key: str):
 pool = mp.pool.ThreadPool()
 start = time.time()
 pycontents = pool.map(do_boto3_download, image_keys)
-#pycontents = []
-#for key in image_keys:
-#    pycontents.append(do_boto3_download(key))
 elapsed_b = time.time() - start
 print("boto3 download group, len={}, {}".format(len(pycontents), elapsed_b))
 
@@ -89,10 +95,8 @@ print("Rust is {:.1f}x faster than Python".format(elapsed_b / elapsed_rust))
 
 print("Benchmarking large get_object operation")
 
-test_objects = ["foo64m.txt", "foo128m.txt", "foo256m.txt", "foo500m.txt", "foo1g.txt", "foo2g.txt", "foo3g.txt", "foo4g.txt", "foo.txt", "foo10G.txt"]
-
 for _ in range(3):
-    for object_key in test_objects:
+    for object_key in TEST_OBJECTS:
         object_path = BUCKET + '/' + object_key
         print(object_path)
 
@@ -118,9 +122,10 @@ for _ in range(3):
 
         object_size_mb = len(contents) / (1024 * 1024)
         print("Rust is {:.1f}x faster than Python download_fileobj and {:.1f}x faster than Python get".format(elapsed_b / elapsed_rust, elapsed_bg / elapsed_rust))
+        # Print in a manner that can be easily converted to CSV for plotting
         print("RESULT-get,{:.1f},{},{},{}".format(object_size_mb, elapsed_bg, elapsed_b, elapsed_rust))
 
-LISTPATH="joshuarobinson/opensky/staging1/movements/"
+
 
 print("Benchmarking list operation")
 start = time.time()
