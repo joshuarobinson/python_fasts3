@@ -106,6 +106,12 @@ for _ in range(3):
         print("fasts3 large get_object, len={}, {}".format(len(contents), elapsed_rust))
 
         start = time.time()
+        with fs.open('/' + object_path) as fp:
+            foo = fp.read()
+        elapsed_fs = time.time() - start
+        print("Download-fsspec ", elapsed_fs)
+
+        start = time.time()
         bytes_buffer = io.BytesIO()
         s3r.meta.client.download_fileobj(Bucket=BUCKET, Key=object_key, Fileobj=bytes_buffer)
         elapsed_b = time.time() - start
@@ -123,7 +129,7 @@ for _ in range(3):
         object_size_mb = len(contents) / (1024 * 1024)
         print("Rust is {:.1f}x faster than Python download_fileobj and {:.1f}x faster than Python get".format(elapsed_b / elapsed_rust, elapsed_bg / elapsed_rust))
         # Print in a manner that can be easily converted to CSV for plotting
-        print("RESULT-get,{:.1f},{},{},{}".format(object_size_mb, elapsed_bg, elapsed_b, elapsed_rust))
+        print("RESULT-get,{:.1f},{},{},{},{}".format(object_size_mb, elapsed_fs, elapsed_bg, elapsed_b, elapsed_rust))
 
 
 
