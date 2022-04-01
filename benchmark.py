@@ -16,7 +16,8 @@ SMALL_PATH=BUCKET + '/' + SMALL_OBJECT
 GROUPPATH="balloons/"
 
 # for list_objects_v2 and ls
-LISTPATH="joshuarobinson/opensky/staging1/movements/"
+LISTPREFIX="opensky/staging1/movements/"
+LISTPATH=BUCKET + '/' + LISTPREFIX
 
 # Large objects of various sizes
 TEST_OBJECTS = ["foo64m.txt", "foo128m.txt", "foo256m.txt", "foo500m.txt", "foo1g.txt", "foo2g.txt", "foo3g.txt", "foo4g.txt", "foo.txt", "foo10G.txt"]
@@ -146,7 +147,7 @@ print("fasts3 ls, len={}, {}".format(len(listing), elapsed_rust))
 
 start = time.time()
 paginator = s3r.meta.client.get_paginator('list_objects_v2')
-pages = paginator.paginate(Bucket='joshuarobinson', Prefix='opensky/staging1/movements/')
+pages = paginator.paginate(Bucket=BUCKET, Prefix=LISTPREFIX)
 # The line below assumes at least one key returned.
 listingb = [obj['Key'] for page in pages for obj in page['Contents']]
 elapsed_py = time.time() - start
