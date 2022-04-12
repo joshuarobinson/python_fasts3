@@ -1,6 +1,6 @@
 use pyo3::exceptions::PyIOError;
 use pyo3::prelude::*;
-use pyo3::types::{PyByteArray, PyList};
+use pyo3::types::{IntoPyDict, PyByteArray, PyDateTime, PyList};
 
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Endpoint, Error, Region};
@@ -9,6 +9,11 @@ use http::Uri;
 use tokio_stream::StreamExt;
 
 const READCHUNK: usize = 1024 * 1024 * 128;
+
+#[allow(dead_code)]
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
+}
 
 #[pyclass]
 pub struct FastS3FileSystem {
@@ -105,6 +110,45 @@ impl FastS3FileSystem {
             Ok(listing)
         });
         listing
+    }
+
+    pub fn info(&self, py: Python, path: &str) -> PyResult<PyObject> {
+        let (bucket, key) = path_to_bucketprefix(&path.to_string());
+        let mut key_vals: Vec<(&str, PyObject)> = vec![("Key", path.to_object(py))];
+
+        let client = self.get_client();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
+        let _info_result = rt.block_on(async {
+            let res = match client.head_object().bucket(bucket).key(key).send().await {
+                Ok(r) => r,
+                Err(e) => return Err(PyIOError::new_err(e.to_string())),
+            };
+            key_vals.push(("Size", res.content_length.to_object(py)));
+            if let Some(etag) = res.e_tag {
+                key_vals.push(("ETag", etag.to_object(py)));
+            }
+            if let Some(mtime) = res.last_modified {
+                let pytime = PyDateTime::from_timestamp(py, mtime.secs() as f64, None)?;
+                key_vals.push(("LastModified", pytime.to_object(py)));
+            }
+            if let Some(ver) = res.version_id {
+                key_vals.push(("VersionId", ver.to_object(py)));
+            } else {
+                key_vals.push(("VersionId", py.None()));
+            }
+            if let Some(sc) = res.storage_class {
+                key_vals.push(("StorageClass", sc.as_str().to_object(py)));
+            } else {
+                // Default to standard because s3fs does.
+                key_vals.push(("StorageClass", "STANDARD".to_object(py)));
+            }
+            // Several fields not implemented, like custom metadata.
+
+            Ok(())
+        });
+        let dict = key_vals.into_py_dict(py);
+        Ok(dict.into())
     }
 
     pub fn get_objects(&self, py: Python, paths: Vec<String>) -> PyResult<PyObject> {
