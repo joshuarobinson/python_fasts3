@@ -2,9 +2,6 @@
 
 set -e
 
-cd fasts3 && cargo fmt && maturin build --release
-cd ..
-
 TAG=pyo3-test
 REPONAME=joshuarobinson
 
