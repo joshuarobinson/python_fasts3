@@ -12,9 +12,9 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.15.1", features = ["extension-module"] }
 #pyo3-asyncio = { version = "0.15.0", features = ["attributes", "tokio-runtime"] }
-aws-config = "0.14.0"
-aws-sdk-s3 = "0.14.0"
-aws-endpoint = "0.14.0"
+aws-config = "0.47.0"
+aws-sdk-s3 = "0.17.0"
+aws-endpoint = "0.47.0"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 http = "0.2"
